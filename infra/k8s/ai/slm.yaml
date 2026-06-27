@@ -1,0 +1,90 @@
+# SLM serving — the internal small language model behind the LLM Gateway in
+# production (settings forbid any external provider in prod). GPU-scheduled,
+# internal image only. The backend reaches it at AI_SLM_ENDPOINT; no request ever
+# leaves the cluster. Replace the image with the org's internal serving build.
+apiVersion: v1
+kind: Service
+metadata:
+  name: slm
+  namespace: fpp-ai
+  labels:
+    app.kubernetes.io/part-of: fpp
+    app.kubernetes.io/name: slm
+spec:
+  selector:
+    app.kubernetes.io/name: slm
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: slm
+  namespace: fpp-ai
+  labels:
+    app.kubernetes.io/part-of: fpp
+    app.kubernetes.io/name: slm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: slm
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: slm
+        app.kubernetes.io/part-of: fpp
+        fpp.tier: ai
+    spec:
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: slm
+          # Replace with the internal serving image (e.g. vLLM / TGI for the SLM).
+          image: registry.internal/fpp/slm-serving:prod
+          ports:
+            - name: http
+              containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 45
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 90
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: "2"
+              memory: "8Gi"
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: "8"
+              memory: "24Gi"
+              nvidia.com/gpu: "1"
+          volumeMounts:
+            - name: cache
+              mountPath: /tmp
+      volumes:
+        - name: cache
+          emptyDir: {}

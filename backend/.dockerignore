@@ -1,0 +1,14 @@
+# Keep the build context (and image) lean and free of host-only artifacts.
+.venv/
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+tests/
+.env
+.env.*
+*.sqlite
+*.db
+.git/
+README.md

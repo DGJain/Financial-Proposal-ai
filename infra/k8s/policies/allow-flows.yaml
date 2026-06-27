@@ -1,0 +1,163 @@
+# The explicit, minimal set of allowed flows on top of default-deny. Together they
+# encode the only paths the platform needs — all intra-cluster, none external:
+#
+#   internet ──✗ (no policy grants it)
+#   ingress ──► frontend:3000
+#   frontend ──► backend:8000
+#   backend ──► data (postgres/redis/chroma/minio) and ai (embedding/slm:8080)
+#
+# Each flow needs BOTH an egress allow on the source and an ingress allow on the
+# destination; both halves are defined here.
+
+# --- app: egress to the data tier -------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: app-egress-to-data
+  namespace: fpp-app
+  labels:
+    app.kubernetes.io/part-of: fpp
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: backend
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: fpp-data
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 6379
+        - protocol: TCP
+          port: 8000
+        - protocol: TCP
+          port: 9000
+---
+# --- app: egress to the ai tier ---------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: app-egress-to-ai
+  namespace: fpp-app
+  labels:
+    app.kubernetes.io/part-of: fpp
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: backend
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: fpp-ai
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# --- app: frontend → backend (same namespace) -------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-egress-to-backend
+  namespace: fpp-app
+  labels:
+    app.kubernetes.io/part-of: fpp
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: frontend
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: backend
+      ports:
+        - protocol: TCP
+          port: 8000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-ingress-from-frontend
+  namespace: fpp-app
+  labels:
+    app.kubernetes.io/part-of: fpp
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: backend
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: frontend
+      ports:
+        - protocol: TCP
+          port: 8000
+---
+# --- app: ingress → frontend (from the internal ingress controller) ---------
+# Adjust the namespaceSelector to your ingress controller's namespace label.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-ingress-from-ingress-controller
+  namespace: fpp-app
+  labels:
+    app.kubernetes.io/part-of: fpp
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: frontend
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 3000
+---
+# --- data: ingress from the app tier ----------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: data-ingress-from-app
+  namespace: fpp-data
+  labels:
+    app.kubernetes.io/part-of: fpp
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: fpp-app
+---
+# --- ai: ingress from the app tier ------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ai-ingress-from-app
+  namespace: fpp-ai
+  labels:
+    app.kubernetes.io/part-of: fpp
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: fpp-app
+      ports:
+        - protocol: TCP
+          port: 8080

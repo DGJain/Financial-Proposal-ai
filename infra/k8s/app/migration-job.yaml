@@ -1,0 +1,54 @@
+# Schema migration Job — runs Alembic against PostgreSQL before/with a rollout.
+# Idempotent (`upgrade head` is a no-op when already current). Wire it as an
+# Argo/Helm pre-sync hook, or run it manually:
+#   kubectl -n fpp-app create job --from=cronjob/... # or apply this once per release.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-migrate
+  namespace: fpp-app
+  labels:
+    app.kubernetes.io/part-of: fpp
+    app.kubernetes.io/name: db-migrate
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: db-migrate
+        app.kubernetes.io/part-of: fpp
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: migrate
+          image: fpp/backend:0.1.0
+          imagePullPolicy: IfNotPresent
+          command: ["alembic", "upgrade", "head"]
+          envFrom:
+            - configMapRef:
+                name: fpp-config
+            - secretRef:
+                name: fpp-secrets
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

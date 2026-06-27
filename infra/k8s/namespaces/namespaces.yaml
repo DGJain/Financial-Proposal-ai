@@ -1,0 +1,36 @@
+# Three namespaces (ARCHITECTURE_SUMMARY.md "Deployment Overview"):
+#   app  — stateless API + UI
+#   data — StatefulSets: PostgreSQL, Redis, ChromaDB, object storage
+#   ai   — GPU: embedding server + internal SLM serving
+#
+# Each enforces the restricted Pod Security Standard, so workloads must run
+# non-root with dropped capabilities and no privilege escalation.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fpp-app
+  labels:
+    app.kubernetes.io/part-of: fpp
+    fpp.tier: app
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fpp-data
+  labels:
+    app.kubernetes.io/part-of: fpp
+    fpp.tier: data
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: fpp-ai
+  labels:
+    app.kubernetes.io/part-of: fpp
+    fpp.tier: ai
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest

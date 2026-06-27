@@ -1,0 +1,98 @@
+# ChromaDB — vector store hosting the three ACL-tagged collections
+# (repo_financial / repo_proposals / repo_templates) on a single persistent
+# volume. The collections are logically independent and independently
+# snapshot/restorable (see infra/scripts/snapshots). One node here; scale-out is
+# a swap to a clustered vector store behind the same VectorStorePort.
+apiVersion: v1
+kind: Service
+metadata:
+  name: chromadb
+  namespace: fpp-data
+  labels:
+    app.kubernetes.io/part-of: fpp
+    app.kubernetes.io/name: chromadb
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: chromadb
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: chromadb
+  namespace: fpp-data
+  labels:
+    app.kubernetes.io/part-of: fpp
+    app.kubernetes.io/name: chromadb
+spec:
+  serviceName: chromadb
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: chromadb
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: chromadb
+        app.kubernetes.io/part-of: fpp
+        fpp.tier: data
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: chromadb
+          image: chromadb/chroma:0.5.5
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: IS_PERSISTENT
+              value: "TRUE"
+            - name: PERSIST_DIRECTORY
+              value: /chroma/chroma
+            - name: ANONYMIZED_TELEMETRY
+              value: "FALSE"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          livenessProbe:
+            httpGet:
+              path: /api/v1/heartbeat
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /api/v1/heartbeat
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "2Gi"
+          volumeMounts:
+            - name: data
+              mountPath: /chroma/chroma
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          app.kubernetes.io/part-of: fpp
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 20Gi

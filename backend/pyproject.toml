@@ -1,0 +1,65 @@
+[tool.poetry]
+name = "financial-proposal-platform-backend"
+version = "0.1.0"
+description = "Air-gapped financial document intelligence and proposal generation platform — backend"
+authors = ["Platform Team"]
+readme = "README.md"
+packages = [{ include = "app" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+# --- API / orchestration ---
+fastapi = "^0.115.0"
+uvicorn = { extras = ["standard"], version = "^0.32.0" }
+langgraph = "^0.2.0"
+pydantic = "^2.9.0"
+pydantic-settings = "^2.6.0"
+# --- persistence / SoR ---
+sqlalchemy = { extras = ["asyncio"], version = "^2.0.0" }
+alembic = "^1.13.0"
+asyncpg = "^0.30.0"
+# --- cache / queue ---
+redis = "^5.2.0"
+# --- vector store ---
+chromadb = "^0.5.0"
+# --- object storage (S3-compatible / MinIO) ---
+boto3 = "^1.35.0"
+# --- document processing ---
+pymupdf = "^1.24.0"
+docling = "^2.0.0"
+paddleocr = "^2.8.0"
+python-docx = "^1.1.0"
+python-pptx = "^1.0.0"
+# --- export rendering (HTML → PDF; pulls reportlab) ---
+xhtml2pdf = "^0.2.17"
+# --- AI plane (prototype provider; prod SLM is internal) ---
+anthropic = "^0.39.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.0"
+pytest-asyncio = "^0.24.0"
+ruff = "^0.7.0"
+mypy = "^1.13.0"
+httpx = "^0.27.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["app", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "ASYNC", "S", "RUF"]
+ignore = ["S101"]  # allow asserts in tests
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

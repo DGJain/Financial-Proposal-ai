@@ -1,0 +1,26 @@
+# Non-secret runtime configuration for the app tier. Secrets (DSNs, object-store
+# credentials) live in the Secret, never here. Every endpoint is an in-cluster
+# address — there is no external host anywhere, which is the air-gap in config form.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fpp-config
+  namespace: fpp-app
+  labels:
+    app.kubernetes.io/part-of: fpp
+data:
+  # --- root settings ---
+  ENVIRONMENT: "production"
+  AIR_GAPPED: "true"
+  # --- AI plane (internal serving in the ai namespace) ---
+  AI_PROVIDER: "slm"
+  AI_EMBEDDING_ENDPOINT: "http://embedding.fpp-ai.svc.cluster.local:8080"
+  AI_EMBEDDING_MODEL_VERSION: "local-embed-v1"
+  AI_SLM_ENDPOINT: "http://slm.fpp-ai.svc.cluster.local:8080"
+  # --- vector store (data namespace) ---
+  CHROMA_HOST: "chromadb.fpp-data.svc.cluster.local"
+  CHROMA_PORT: "8000"
+  # --- object storage (data namespace) ---
+  OBJECT_STORAGE_ENDPOINT_URL: "http://minio.fpp-data.svc.cluster.local:9000"
+  # --- frontend → backend (same namespace) ---
+  BACKEND_URL: "http://backend.fpp-app.svc.cluster.local:8000"

@@ -1,0 +1,90 @@
+# Embedding server — the local embedding model behind EmbedderPort. GPU-scheduled,
+# internal image only (no model is pulled from the internet). The embedding model
+# version is pinned in app config (AI_EMBEDDING_MODEL_VERSION) because it governs
+# collection comparability. Replace the image with the org's internal registry ref.
+apiVersion: v1
+kind: Service
+metadata:
+  name: embedding
+  namespace: fpp-ai
+  labels:
+    app.kubernetes.io/part-of: fpp
+    app.kubernetes.io/name: embedding
+spec:
+  selector:
+    app.kubernetes.io/name: embedding
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: embedding
+  namespace: fpp-ai
+  labels:
+    app.kubernetes.io/part-of: fpp
+    app.kubernetes.io/name: embedding
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: embedding
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: embedding
+        app.kubernetes.io/part-of: fpp
+        fpp.tier: ai
+    spec:
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: embedding
+          # Replace with the internal serving image (e.g. TEI / vLLM-embeddings).
+          image: registry.internal/fpp/embedding-server:local-embed-v1
+          ports:
+            - name: http
+              containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: "1"
+              memory: "4Gi"
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: "4"
+              memory: "8Gi"
+              nvidia.com/gpu: "1"
+          volumeMounts:
+            - name: cache
+              mountPath: /tmp
+      volumes:
+        - name: cache
+          emptyDir: {}

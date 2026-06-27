@@ -1,0 +1,44 @@
+# Aggregates the full platform manifest set. Render or validate without a cluster:
+#   kubectl kustomize infra/k8s
+#   kubectl apply --dry-run=client -k infra/k8s
+# Apply (in order kubectl resolves) to a real cluster:
+#   kubectl apply -k infra/k8s
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# A non-selector common label (does not mutate immutable Deployment selectors).
+labels:
+  - pairs:
+      app.kubernetes.io/managed-by: kustomize
+    includeSelectors: false
+
+resources:
+  # namespaces first
+  - namespaces/namespaces.yaml
+  # app tier
+  - app/configmap.yaml
+  - app/secret.yaml
+  - app/backend.yaml
+  - app/frontend.yaml
+  - app/migration-job.yaml
+  - app/ingress.yaml
+  # data tier
+  - data/secrets.yaml
+  - data/postgres.yaml
+  - data/redis.yaml
+  - data/chromadb.yaml
+  - data/minio.yaml
+  # ai tier
+  - ai/embedding.yaml
+  - ai/slm.yaml
+  # network policies (air-gap)
+  - policies/default-deny.yaml
+  - policies/allow-dns.yaml
+  - policies/allow-flows.yaml
+
+# Pin image tags in one place (override per environment with an overlay).
+images:
+  - name: fpp/backend
+    newTag: 0.1.0
+  - name: fpp/frontend
+    newTag: 0.1.0

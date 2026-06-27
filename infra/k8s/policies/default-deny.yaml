@@ -1,0 +1,36 @@
+# Default-deny for all three namespaces: every pod starts with NO ingress and NO
+# egress. This is the air-gap expressed at the network layer — nothing talks to
+# anything (not even DNS or the internet) until an explicit allow policy below
+# grants a specific, intra-cluster flow.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: fpp-app
+  labels:
+    app.kubernetes.io/part-of: fpp
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress", "Egress"]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: fpp-data
+  labels:
+    app.kubernetes.io/part-of: fpp
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress", "Egress"]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: fpp-ai
+  labels:
+    app.kubernetes.io/part-of: fpp
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress", "Egress"]

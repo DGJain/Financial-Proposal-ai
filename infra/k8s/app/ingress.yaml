@@ -1,0 +1,26 @@
+# Internal ingress — exposes the UI to the enterprise network only (never the
+# public internet). The class is an internal-only controller; the host resolves
+# on the internal DNS zone. The backend is intentionally NOT exposed via ingress;
+# it is reachable only in-cluster by the frontend's server-side proxy.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: fpp-ui
+  namespace: fpp-app
+  labels:
+    app.kubernetes.io/part-of: fpp
+  annotations:
+    kubernetes.io/ingress.class: internal
+spec:
+  ingressClassName: internal
+  rules:
+    - host: proposals.internal
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 3000
